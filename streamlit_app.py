@@ -39,12 +39,12 @@ def importar_clientes():
 df_agendamentos = importar_agendamentos()
 df_clientes = importar_clientes()
 st.title ('BiruBeard Analytics')
-
+df_agendamentos
 fat_por_ano = px.bar(df_agendamentos[['ano','Receita total']].groupby(by=['ano']).sum().reset_index(), x="ano", y="Receita total",text_auto=True, title='Faturamento por ano')
 st.plotly_chart(fat_por_ano, use_container_width=True,)
 #st.write(df_agendamentos.shape)
 #df_agendamentos
 st.write("----")
-st.write("####")
+st.write("###")
 #st.write(df_clientes.shape)
 #df_clientes
