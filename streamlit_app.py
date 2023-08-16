@@ -39,8 +39,24 @@ def importar_clientes():
 df_agendamentos = importar_agendamentos()
 df_clientes = importar_clientes()
 st.title ('BiruBeard Analytics')
-fat_por_ano = px.bar(df_agendamentos[['ano','Receita total']].groupby(by=['ano']).sum().reset_index(), x="ano", y="Receita total",text_auto=True, title='Faturamento por ano')
-st.plotly_chart(fat_por_ano, use_container_width=True)
-st.write("-----")
-st.write("###")
 
+col1,col2=st.columns([3,1])
+with col1:
+    ano_atual=df_agendamentos['ano'].max()
+    ultimo_mes_ano_atual=df_agendamentos[df_agendamentos['ano']==2023]['mes'].max()
+    faturamento_ate_mes_atual=df_agendamentos[(df_agendamentos['mes']<=ultimo_mes_ano_atual)][['ano','Receita total']].groupby(by=['ano']).sum().reset_index()
+    fat_por_ano = px.bar(df_agendamentos[['ano','Receita total']].groupby(by=['ano']).sum().reset_index(), x="ano", y="Receita total",text_auto=True, title='Faturamento por ano')
+    fat_por_ano.add_trace(go.Scatter(x=faturamento_ate_mes_atual['ano'], y=faturamento_ate_mes_atual['Receita total'], mode='markers', text='x', showlegend=False))
+    fat_por_ano.update_traces(marker=dict(size=6,color='red'),selector=dict(mode='markers'))
+    st.plotly_chart(fat_por_ano, use_container_width=True,)
+with col2:
+    faturamento_ate_mes_atual_ano_atual=faturamento_ate_mes_atual[faturamento_ate_mes_atual['ano']==ano_atual]['Receita total'].values[0]
+    faturamento_ate_mes_atual_ano_anterior=faturamento_ate_mes_atual[faturamento_ate_mes_atual['ano']==ano_atual-1]['Receita total'].values[0]
+    crescimento_ytd = (faturamento_ate_mes_atual_ano_atual-faturamento_ate_mes_atual_ano_anterior)/faturamento_ate_mes_atual_ano_anterior
+    st.write(f'No Year to Date, até o mês atual, temos um crescimento de: **{round(crescimento_ytd*100,1)}%**, com **R${round(faturamento_ate_mes_atual_ano_atual-faturamento_ate_mes_atual_ano_anterior,2)}** faturado a mais que no mesmo período do ano anterior.')
+#st.write(df_agendamentos.shape)
+#df_agendamentos
+st.write("----")
+st.write("###")
+#st.write(df_clientes.shape)
+#df_clientes
