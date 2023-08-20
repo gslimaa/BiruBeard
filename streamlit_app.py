@@ -51,7 +51,7 @@ with col1:
     ultimo_mes_ano_atual=df_agendamentos[df_agendamentos['ano']==2023]['mes'].max()
     faturamento_ate_mes_atual=df_agendamentos[(df_agendamentos['mes']<=ultimo_mes_ano_atual)][['ano','Receita total']].groupby(by=['ano']).sum().reset_index()
     fat_por_ano = px.bar(df_agendamentos[['ano','Receita total']].groupby(by=['ano']).sum().reset_index(), x="ano", y="Receita total",text_auto=True, title='Faturamento por ano')
-    fat_por_ano.add_trace(go.Scatter(x=faturamento_ate_mes_atual['ano'], y=faturamento_ate_mes_atual['Receita total'], mode='markers', text='x', showlegend=False))
+    fat_por_ano.add_trace(go.Scatter(x=faturamento_ate_mes_atual['ano'], y=faturamento_ate_mes_atual['Receita total'], mode='lines+markers', text='x', showlegend=False))
     fat_por_ano.update_traces(marker=dict(size=6,color='red'),selector=dict(mode='markers'))
     st.plotly_chart(fat_por_ano, use_container_width=True,)
 with col2:
@@ -68,20 +68,26 @@ with col1:
         selecao_mes=st.radio("Selecione o mês:" ,df_agendamentos[df_agendamentos['ano']==selecao_ano]['mes'].unique().astype(int))
 with col2:
     df_vendas_por_categoria_barbeiro=df_agendamentos[(df_agendamentos['mes']==selecao_mes) & (df_agendamentos['ano']==selecao_ano)][['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().reset_index()
+    df_vendas_por_categoria_barbeiro['Porcentagem']=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)][['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
+    df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
     vendas_categoria_barbeiro=make_subplots(rows=1, cols=df_vendas_por_categoria_barbeiro['Funcionário'].nunique(), subplot_titles=df_vendas_por_categoria_barbeiro['Funcionário'].unique())
     i=1
+    selecao_visao=st.radio("Ver por:" ,['Receita total','Porcentagem'])
+
     for funcionario in df_vendas_por_categoria_barbeiro['Funcionário'].unique():
         vendas_categoria_barbeiro.add_trace(go.Bar(
                 name=funcionario,
-                y=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario]['Receita total'],
+                y=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario][selecao_visao],
                 x=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario]['Categoria principal'],
-                text=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario]['Receita total']),
+                text=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario][selecao_visao]),
                 #marker=dict(color=cores_personalizadas[0])),
                 row=1, col=i)
+        if selecao_visao=='Porcentagem':
+            vendas_categoria_barbeiro.update_traces(texttemplate='%{y}%', textposition='inside', textangle=0)
         if i>1:
-            vendas_categoria_barbeiro.update_yaxes(showticklabels=False, row=1, col=i,range=[0,df_vendas_por_categoria_barbeiro['Receita total'].max()*1.1])
+            vendas_categoria_barbeiro.update_yaxes(showticklabels=False, row=1, col=i,range=[0,df_vendas_por_categoria_barbeiro[selecao_visao].max()*1.1])
         else:
-            vendas_categoria_barbeiro.update_yaxes(row=1, col=i,range=[0,df_vendas_por_categoria_barbeiro['Receita total'].max()*1.1])
+            vendas_categoria_barbeiro.update_yaxes(row=1, col=i,range=[0,df_vendas_por_categoria_barbeiro[selecao_visao].max()*1.1])
         i+=1
     st.plotly_chart(vendas_categoria_barbeiro, use_container_width=True,)
 #st.write(df_agendamentos.shape)
