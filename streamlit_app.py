@@ -14,7 +14,7 @@ from plotly.subplots import make_subplots
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
-
+#ok
 #@st.cache_data.clear()
 @st.cache_data(ttl=3600)
 def importar_agendamentos():
