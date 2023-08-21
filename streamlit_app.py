@@ -18,7 +18,7 @@ favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 
 @st.cache_data.clear()
-@st.cache_data(ttl=3600)
+@st.cache_data()
 def importar_agendamentos():
     df=pd.read_excel(r"lista_de_agendamentos.xlsx",header=7)
     df.drop('Unnamed: 0', axis=1,inplace=True)
@@ -31,7 +31,7 @@ def importar_agendamentos():
     #df_limpo= df.astype(str) # convertendo todas as colunas em str
     return df
 
-@st.cache_data(ttl=3600)
+@st.cache_data()
 def importar_clientes():
     df=pd.read_excel(r"base_clientes.xlsx",header=7)
     df.drop('Unnamed: 0', axis=1,inplace=True)
