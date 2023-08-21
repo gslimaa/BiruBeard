@@ -17,7 +17,7 @@ from calendar import monthrange
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 
-@st.cache_data.clear()
+#@st.cache_data.clear()
 @st.cache_data()
 def importar_agendamentos():
     df=pd.read_excel(r"lista_de_agendamentos.xlsx",header=7)
