@@ -17,7 +17,7 @@ from calendar import monthrange
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 
-#@st.cache_data.clear()
+@st.cache_data.clear()
 @st.cache_data(ttl=3600)
 def importar_agendamentos():
     df=pd.read_excel(r"lista_de_agendamentos.xlsx",header=7)
@@ -94,52 +94,103 @@ with col2:
     st.metric(label=f"Faturamento mês {mes_atual_str}:", value=f"R${fat_mes_atual:,.2f}", delta=f"{crescimento_mes:.2%} vs {dict_meses[ultimo_mes_ano_atual-1]}")
     st.write('---')
     #st.write(f'Faturamento do mês atual em {ano_atual-1:.0f}: **R${fat_mes_atual_ano_passado:,.2f}**')
-    st.write(f'Faturamento projetado: **R${fat_projetado_mes_atual:,.2f}**')
+    st.write(f'Faturamento projetado {mes_atual_str}: **R${fat_projetado_mes_atual:,.2f}**')
     #st.write(dia_atual)
     st.write(f'QTD de tickets {mes_atual_str}: **{tickets_mes_atual}**')
     st.write(f'Ticket médio {mes_atual_str}: **R${round(fat_mes_atual/tickets_mes_atual,2)}**')
     st.write('---')
 
     
-col1,col2=st.columns([1,9])
+
+num_colunas = df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)]['Funcionário'].nunique()
+num_colunas
+coluna=0
+
+col1,col2,col3,col4 = st.columns([1,1,1,1])
 with col1:
-    col11,col22=st.columns([1,1])
-    with col11:
-        selecao_ano=st.radio("Selecione o ano:" ,df_agendamentos['ano'].unique().astype(int))
-    with col22:
-        selecao_mes=st.radio("Selecione o mês:" ,df_agendamentos[df_agendamentos['ano']==selecao_ano]['mes'].unique().astype(int))
+    selecao_ano2=st.radio("Selecione o ano:  " ,df_agendamentos['ano'].unique().astype(int),horizontal=True)
 with col2:
-    df_vendas_por_categoria_barbeiro=df_agendamentos[(df_agendamentos['mes']==selecao_mes) & (df_agendamentos['ano']==selecao_ano)][['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().reset_index()
-    df_vendas_por_categoria_barbeiro['Porcentagem']=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)][['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
-    df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
-    vendas_categoria_barbeiro=make_subplots(rows=1, cols=df_vendas_por_categoria_barbeiro['Funcionário'].nunique(), subplot_titles=df_vendas_por_categoria_barbeiro['Funcionário'].unique())
-    i=1
-    selecao_visao=st.radio("Ver por:" ,['Receita total','Porcentagem'])
+    selecao_mes2=st.radio("Selecione o mês:  " ,df_agendamentos[df_agendamentos['ano']==selecao_ano2]['mes'].unique().astype(int),horizontal=True)
+with col3:
+    selecao_visao=st.radio("Ver por:" ,['Valor','Porcentagem'], horizontal=True)
+    dict_visao={'Valor':'Receita total','Porcentagem':'Porcentagem'}
+with col4:
+    selecao_visao2=st.radio("Ver por:  ",['Receita total','QTD'], horizontal=True)
+st.write('###')
+st.write('###')
+mes_selecionado_str=dict_meses[selecao_mes2]
 
-    for funcionario in df_vendas_por_categoria_barbeiro['Funcionário'].unique():
+selecao_func_para_iterar=np.sort(df_agendamentos[(df_agendamentos['mes']==selecao_mes2) & (df_agendamentos['ano']==selecao_ano2)]['Funcionário'].unique())
+#selecao_func_para_iterar
+
+colunas=st.columns(num_colunas)
+for func in selecao_func_para_iterar:
+
+    with colunas[coluna]:
+        st.write(f"**{func}** - **{mes_selecionado_str}/{int(selecao_ano2)}**")
+        df_func_atual=df_agendamentos[(df_agendamentos['mes']==selecao_mes2) & (df_agendamentos['ano']==selecao_ano2) & (df_agendamentos['Funcionário']==func)]
 
 
-
-
-
-        vendas_categoria_barbeiro.add_trace(go.Bar(
-                name=funcionario,
-                y=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario][selecao_visao],
-                x=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario]['Categoria principal'],
-                text=df_vendas_por_categoria_barbeiro[df_vendas_por_categoria_barbeiro['Funcionário']==funcionario][selecao_visao]),
-                #marker=dict(color=cores_personalizadas[0])),
-                row=1, col=i)
-        
-        if selecao_visao=='Porcentagem':
-            vendas_categoria_barbeiro.update_traces(texttemplate='%{y}%', textposition='inside', textangle=0)
-        if i>1:
-            vendas_categoria_barbeiro.update_yaxes(showticklabels=False, row=1, col=i,range=[0,df_vendas_por_categoria_barbeiro[selecao_visao].max()*1.1])
+        #Criação da tabela pro gráfico
+        if selecao_visao2=='QTD':
+            df_vendas_por_categoria_barbeiro=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).count().reset_index()
+            df_vendas_por_categoria_barbeiro['Porcentagem']=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).count().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
+            df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
         else:
-            vendas_categoria_barbeiro.update_yaxes(row=1, col=i,range=[0,df_vendas_por_categoria_barbeiro[selecao_visao].max()*1.1])
-        i+=1
-        #st.write(funcionario)
-    st.plotly_chart(vendas_categoria_barbeiro, use_container_width=True)
 
+            df_vendas_por_categoria_barbeiro=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().reset_index()
+            df_vendas_por_categoria_barbeiro['Porcentagem']=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
+            df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
+
+        #Criação do gráfico por funcionario
+
+        fig_vendas_categoria_barbeiro=px.bar(
+                df_vendas_por_categoria_barbeiro,
+                #name=funcionario,
+                y=dict_visao[selecao_visao],
+                x='Categoria principal',
+                text=dict_visao[selecao_visao])
+        fig_vendas_categoria_barbeiro.update_yaxes(title_text='')
+        fig_vendas_categoria_barbeiro.update_xaxes(title_text='')
+        if dict_visao[selecao_visao]=='Porcentagem':
+            fig_vendas_categoria_barbeiro.update_traces(texttemplate='%{y}%', textposition='inside', textangle=0)
+        else:
+            fig_vendas_categoria_barbeiro.update_traces(texttemplate='%{text:.2s}', textposition='inside', textangle=0)
+        st.plotly_chart(fig_vendas_categoria_barbeiro, use_container_width=True)
+
+
+
+
+
+
+
+
+
+
+
+        
+        qtd_tickets_atual_func=df_func_atual[df_func_atual['Status']=='Concluída']['ID da Reserva'].count()
+        faturamento_atual_func=df_func_atual['Receita total'].sum()
+        st.write(f'Faturamento {mes_selecionado_str}/{int(selecao_ano2)}: **R${faturamento_atual_func:,.2f}**')
+        st.write(f'Qtd Tickets {mes_selecionado_str}/{int(selecao_ano2)}: **{qtd_tickets_atual_func}**')
+        st.write(f'Ticket médio {mes_selecionado_str}/{int(selecao_ano2)}: **R{faturamento_atual_func/qtd_tickets_atual_func:,.2f}**')
+       
+
+
+
+
+        
+        
+
+
+
+
+        st.write('-----')
+    coluna=coluna+1
+
+#st.write(df_agendamentos.shape)
+#df_agendamentos
 st.write("----")
 st.write("###")
-
+#st.write(df_clientes.shape)
+#df_clientes
