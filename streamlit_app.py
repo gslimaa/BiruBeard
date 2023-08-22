@@ -12,7 +12,11 @@ import numpy as np
 from st_pages import show_pages_from_config
 from plotly.subplots import make_subplots
 import datetime as dt
+from datetime import datetime
 from calendar import monthrange
+import requests
+from unicodedata import normalize
+
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
@@ -20,35 +24,109 @@ st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initi
 #@st.cache_data.clear()
 @st.cache_data()
 def importar_agendamentos():
-    df=pd.read_excel(r"lista_de_agendamentos.xlsx",header=7)
+    df=pd.read_excel(r"lista_fixa.xlsx",header=7)
     df.drop('Unnamed: 0', axis=1,inplace=True)
     df.drop('Unnamed: 1', axis=1,inplace=True)
-    df['Data e hora']=pd.to_datetime(df['Data e hora'],dayfirst=True)
-    df['ano'] = pd.DatetimeIndex(df['Data e hora']).year
-    df['mes'] = pd.DatetimeIndex(df['Data e hora']).month
+
     last_line=df.tail(1).index.values.astype(int)
     df.drop(last_line,inplace=True)
-    #df_limpo= df.astype(str) # convertendo todas as colunas em str
     return df
 
-@st.cache_data()
-def importar_clientes():
-    df=pd.read_excel(r"base_clientes.xlsx",header=7)
-    df.drop('Unnamed: 0', axis=1,inplace=True)
-    df.drop('Unnamed: 1', axis=1,inplace=True)
-    df['Primeira visita']=pd.to_datetime(df['Primeira visita'],dayfirst=True)
-    df['Ultima visita']=pd.to_datetime(df['Ultima visita'],dayfirst=True)
-    last_line=df.tail(1).index.values.astype(int)
-    df.drop(last_line,inplace=True)
-    #df_limpo= df.astype(str) # convertendo todas as colunas em str
+@st.cache_data(ttl=3540)
+def importar_ao_vivo_agendamentos():
+
+    hoje=datetime.today().strftime('%Y-%m-%d')
+    #hoje=hoje.day
+    headers = {
+    'authority': 'br.booksy.com',
+    'accept': 'application/json, text/plain, */*',
+    'accept-language': 'pt',
+    'baggage': 'sentry-transaction=appointments.details,sentry-public_key=8d02039ec46b4fc98b3f2fb292a10a1e,sentry-trace_id=a1bd457097d14fbcad8023438bab7721,sentry-sample_rate=2',
+    'cache-control': 'no-cache',
+    'origin': 'https://stats-and-reports.booksy.com',
+    'pragma': 'no cache',
+    'referer': 'https://stats-and-reports.booksy.com/',
+    'sec-ch-ua': '"Not/A)Brand";v="99", "Google Chrome";v="115", "Chromium";v="115"',
+    'sec-ch-ua-mobile': '?1',
+    'sec-ch-ua-platform': '"Android"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'sentry-trace': 'a1bd457097d14fbcad8023438bab7721-a707814464af3ec3-1',
+    'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36',
+    'x-access-token': 'nznw0hl6zohx464shiq5f8mgei3ex1xj',
+    'x-api-key': 'frontdesk-76661e2b-25f0-49b4-b33a-9d78957a58e3',
+    'x-app-version': '3.0',
+    'x-fingerprint': 'de120e42-7f23-40f8-b1e0-63a7b928ce4c',
+    }
+    params = {
+    'date_from': '2023-08-01',
+    'date_till': hoje,
+    'time_span': 'month',
+    'report_key': 'appointments_list',
+    }
+    dados=[]
+    response = requests.get('https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report',params=params,headers=headers)
+    data = response.json()
+    total_pages = data['sections'][0]['pagination']['last_page']
+    #st.write(total_pages)
+    for page in range(0, total_pages+1):
+        response=requests.get('https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report?'+f"&page={page}",params=params,headers=headers).json()
+        novos_resultados=response.get("sections",[])
+        dados.extend(novos_resultados)
+        #page+=1
+
+    rows = []
+    for section in dados:
+        if "table" in section and "rows" in section["table"]:
+            rows.extend(section["table"]["rows"])
+
+    # Create a DataFrame from the extracted rows
+    df = pd.DataFrame(rows)
+
+    dict_troca_nome_header={'booking_date': 'Data e hora',
+    'subbooking_id': 'ID da Reserva',
+    'service_category_name': 'Categoria principal',
+    'service_name': 'Serviço',
+    'customer_name': 'Cliente',
+    'staffer_name': 'Funcionário',
+    'service_length': 'Comprimento do serviço',
+    'service_value': 'Valor dos serviços',
+    'addons_value': 'Valor dos complementos',
+    'revenue_net': 'Receita líquida',
+    'discount': 'Desconto',
+    'tax_amount': 'Taxa',
+    'tip_amount': 'Valor do troco',
+    'total_revenue': 'Receita total',
+    'status': 'Status'}
+    df.rename(columns=dict_troca_nome_header,inplace=True)
+
+    colunas_a_ajustar=['Valor dos serviços','Valor dos complementos','Receita líquida','Desconto','Taxa','Valor do troco','Receita total']
+
+    for coluna in colunas_a_ajustar:
+        df[coluna] = df[coluna].str.replace(r'[^\d.,]', '', regex=True)
+        df[coluna] = df[coluna].str.replace(',', '.', regex=True)
+        df[coluna] = df[coluna].astype(float)
     return df
+
 
 df_agendamentos = importar_agendamentos()
-df_clientes = importar_clientes()
+df_agendamentos_ao_vivo=importar_ao_vivo_agendamentos()
+
+somaaa=df_agendamentos_ao_vivo['Receita total'].sum()
+st.write(somaaa)
+
+df_agendamentos = pd.concat([df_agendamentos,df_agendamentos_ao_vivo],ignore_index=True)
+df_agendamentos['Data e hora']=pd.to_datetime(df_agendamentos['Data e hora'],dayfirst=True)
+df_agendamentos['ano'] = pd.DatetimeIndex(df_agendamentos['Data e hora']).year
+df_agendamentos['mes'] = pd.DatetimeIndex(df_agendamentos['Data e hora']).month
+
+
+
+
 st.title ('BiruBeard Analytics')
 
 dict_meses={1:'jan',2:'fev',3:'mar',4:'abr',5:'mai',6:'jun',7:'jul',8:'ago',9:'set',10:'out',11:'nov',12:'dez'}
-
 col1,col2=st.columns([3,1])
 with col1:
     ano_atual=df_agendamentos['ano'].max()
@@ -103,14 +181,14 @@ with col2:
     
 
 num_colunas = df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)]['Funcionário'].nunique()
-num_colunas
+
 coluna=0
 
 col1,col2,col3,col4 = st.columns([1,1,1,1])
 with col1:
     selecao_ano2=st.radio("Selecione o ano:  " ,df_agendamentos['ano'].unique().astype(int),horizontal=True)
 with col2:
-    selecao_mes2=st.radio("Selecione o mês:  " ,df_agendamentos[df_agendamentos['ano']==selecao_ano2]['mes'].unique().astype(int),horizontal=True)
+    selecao_mes2=st.radio("Selecione o mês:  " ,np.sort(df_agendamentos[df_agendamentos['ano']==selecao_ano2]['mes'].unique().astype(int))[::-1],horizontal=True)
 with col3:
     selecao_visao=st.radio("Ver por:" ,['Valor','Porcentagem'], horizontal=True)
     dict_visao={'Valor':'Receita total','Porcentagem':'Porcentagem'}
