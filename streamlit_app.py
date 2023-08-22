@@ -21,7 +21,7 @@ from unicodedata import normalize
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 #123
-#@st.cache_data.clear()
+@st.cache_data.clear()
 @st.cache_data()
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
@@ -113,8 +113,6 @@ def importar_ao_vivo_agendamentos():
 df_agendamentos = importar_agendamentos()
 df_agendamentos_ao_vivo=importar_ao_vivo_agendamentos()
 
-somaaa=df_agendamentos_ao_vivo['Receita total'].sum()
-st.write(somaaa)
 
 df_agendamentos = pd.concat([df_agendamentos,df_agendamentos_ao_vivo],ignore_index=True)
 df_agendamentos['Data e hora']=pd.to_datetime(df_agendamentos['Data e hora'],dayfirst=True)
