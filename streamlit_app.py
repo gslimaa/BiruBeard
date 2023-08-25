@@ -287,7 +287,7 @@ for func in selecao_func_para_iterar:
                 
            
             df_func_atual=df_agendamentos[(df_agendamentos['mes']==selecao_mes2) & (df_agendamentos['ano']==selecao_ano2) & (df_agendamentos['Funcionário']==func)]
-
+            df_clientes_recorrentes_func=df_clientes_recorrentes[df_clientes_recorrentes['Funcionário']==func]
 
             #Criação da tabela pro gráfico
             if selecao_visao2=='QTD':
