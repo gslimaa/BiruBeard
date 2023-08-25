@@ -21,9 +21,9 @@ import math
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
-
-#@st.cache_data.clear()
-@st.cache_data()
+#123
+@st.cache_data.clear()
+@st.cache_data(show_spinner="Carregando dados")
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
     df.drop('Unnamed: 0', axis=1,inplace=True)
@@ -33,9 +33,13 @@ def importar_agendamentos():
     df.drop(last_line,inplace=True)
     return df
 
-@st.cache_data(ttl=3600)
-def importar_ao_vivo_agendamentos():
+def fetch_page_data(page, headers, params):
+    response = requests.get(f'https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report?page={page}', params=params, headers=headers)
+    return response.json().get("sections", [])
 
+
+@st.cache_data(ttl=3600,show_spinner="Carregando dados")
+def importar_ao_vivo_agendamentos():
     hoje=datetime.today().strftime('%Y-%m-%d')
     #hoje=hoje.day
     headers = {
@@ -60,31 +64,34 @@ def importar_ao_vivo_agendamentos():
     'x-app-version': '3.0',
     'x-fingerprint': 'de120e42-7f23-40f8-b1e0-63a7b928ce4c',
     }
+
     params = {
     'date_from': '2023-08-01',
     'date_till': hoje,
     'time_span': 'month',
     'report_key': 'appointments_list',
     }
+
+    # Obtenha informações da primeira página para determinar o total de páginas
+    first_page_response = requests.get('https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report', params=params, headers=headers)
+    first_page_data = first_page_response.json()
+    total_pages = first_page_data['sections'][0]['pagination']['last_page']
+
     dados=[]
-    response = requests.get('https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report',params=params,headers=headers)
-    data = response.json()
-    total_pages = data['sections'][0]['pagination']['last_page']
-    #st.write(total_pages)
-    for page in range(0, total_pages+1):
-        response=requests.get('https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report?'+f"&page={page}",params=params,headers=headers).json()
-        novos_resultados=response.get("sections",[])
-        dados.extend(novos_resultados)
-        #page+=1
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(fetch_page_data, page, headers, params) for page in range(1, total_pages + 1)]
+        for future in concurrent.futures.as_completed(futures):
+            page_data = future.result()
+            dados.extend(page_data)
 
     rows = []
     for section in dados:
         if "table" in section and "rows" in section["table"]:
             rows.extend(section["table"]["rows"])
-
-    # Create a DataFrame from the extracted rows
+      
     df = pd.DataFrame(rows)
-
+    
     dict_troca_nome_header={'booking_date': 'Data e hora',
     'subbooking_id': 'ID da Reserva',
     'service_category_name': 'Categoria principal',
@@ -101,19 +108,21 @@ def importar_ao_vivo_agendamentos():
     'total_revenue': 'Receita total',
     'status': 'Status'}
     df.rename(columns=dict_troca_nome_header,inplace=True)
-
+    
+    
     colunas_a_ajustar=['Valor dos serviços','Valor dos complementos','Receita líquida','Desconto','Taxa','Valor do troco','Receita total']
 
     for coluna in colunas_a_ajustar:
         df[coluna] = df[coluna].str.replace(r'[^\d.,]', '', regex=True)
         df[coluna] = df[coluna].str.replace(',', '.', regex=True)
         df[coluna] = df[coluna].astype(float)
-    return df
+    
+    
+    return df 
 
 
 
-
-@st.cache_data()
+@st.cache_data(show_spinner="Carregando dados",ttl=86400)
 def importar_contato_clientes():
 
     headers = {
