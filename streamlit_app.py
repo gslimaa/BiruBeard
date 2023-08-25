@@ -23,7 +23,7 @@ import concurrent.futures
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 #123
-@st.cache_data.clear()
+#@st.cache_data.clear()
 @st.cache_data(show_spinner="Carregando dados")
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
@@ -40,7 +40,7 @@ def fetch_page_data(page, headers, params):
     return response.json().get("sections", [])
 
 
-@st.cache_data(ttl=3600,show_spinner="Carregando dados")
+@st.cache_data(ttl=3610,show_spinner="Carregando dados")
 def importar_ao_vivo_agendamentos():
     hoje=datetime.today().strftime('%Y-%m-%d')
     #hoje=hoje.day
