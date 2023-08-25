@@ -12,15 +12,16 @@ import numpy as np
 from st_pages import show_pages_from_config
 from plotly.subplots import make_subplots
 import datetime as dt
-from datetime import datetime
+from datetime import datetime, timedelta
 from calendar import monthrange
 import requests
 from unicodedata import normalize
+import math
 
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
-#123
+
 #@st.cache_data.clear()
 @st.cache_data()
 def importar_agendamentos():
@@ -32,7 +33,7 @@ def importar_agendamentos():
     df.drop(last_line,inplace=True)
     return df
 
-@st.cache_data(ttl=3540)
+@st.cache_data(ttl=3600)
 def importar_ao_vivo_agendamentos():
 
     hoje=datetime.today().strftime('%Y-%m-%d')
@@ -110,27 +111,98 @@ def importar_ao_vivo_agendamentos():
     return df
 
 
+
+
+@st.cache_data()
+def importar_contato_clientes():
+
+    headers = {
+        'authority': 'br.booksy.com',
+        'accept': 'application/json, text/plain, */*',
+        'accept-language': 'pt',
+        'bksreqid': '0fedaa69-3c02-4ecc-8d11-8e9873939bce',
+        'cache-control': 'no-cache',
+        'origin': 'https://booksy.com',
+        'pragma': 'no-cache',
+        'referer': 'https://booksy.com/',
+        'sec-ch-ua': '"Chromium";v="116", "Not)A;Brand";v="24", "Google Chrome";v="116"',
+        'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-platform': '"Android"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'same-site',
+        'sentry-trace': '699c11c1a3144747be2faca18606772c-9cafbcbcc8e291f4-0',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36',
+        'x-access-token': 'nznw0hl6zohx464shiq5f8mgei3ex1xj',
+        'x-analytics-tokens': 'client_id;51034599.1691522928;browser_fingerprint;1055082207759801405',
+        'x-api-key': 'frontdesk-76661e2b-25f0-49b4-b33a-9d78957a58e3',
+        'x-app-version': '3.0',
+        'x-appsflyer-user-id': '4f728388-9a0e-4869-9c5b-48bede256a05-p',
+        'x-fingerprint': '02a70b27-6e0a-44a5-8d6c-5f235e95cb25',
+        'x-user-pseudo-id': '51034599.1691522928',
+    }
+
+    params = {
+        'page': 1,
+        'per_page': '100',
+        'compact': 'true',
+    }
+
+    all_customers = []  # Para armazenar todos os clientes
+
+    while True:
+        response = requests.get(
+            'https://br.booksy.com/api/br/2/business_api/me/businesses/60247/customers',
+            params=params,
+            headers=headers,
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            customers = data['customers']
+            all_customers.extend(customers)
+            
+            # Verifica se há mais páginas a serem percorridas
+            if data['page'] < 58:
+                params['page'] += 1
+            else:
+                break
+        else:
+            print("Erro na solicitação:", response.status_code)
+            break
+
+    
+    df=pd.DataFrame(all_customers)[['a_to_z','cell_phone','email']]
+    #display(df)
+    df_grouped = df.groupby('a_to_z').agg({'cell_phone': ';'.join, 'email': ';'.join}).reset_index()
+    df_grouped=df_grouped.rename(columns={'a_to_z':'Nome','cell_phone':'Celular','Email':'email'})
+    return df_grouped
+
+
 df_agendamentos = importar_agendamentos()
 df_agendamentos_ao_vivo=importar_ao_vivo_agendamentos()
-
+df_contatos_clientes=importar_contato_clientes()
 
 df_agendamentos = pd.concat([df_agendamentos,df_agendamentos_ao_vivo],ignore_index=True)
 df_agendamentos['Data e hora']=pd.to_datetime(df_agendamentos['Data e hora'],dayfirst=True)
 df_agendamentos['ano'] = pd.DatetimeIndex(df_agendamentos['Data e hora']).year
 df_agendamentos['mes'] = pd.DatetimeIndex(df_agendamentos['Data e hora']).month
-
-
+df_agendamentos['dia'] = pd.DatetimeIndex(df_agendamentos['Data e hora']).day
+hoje=datetime.today().day
+ontem=(datetime.today().day)-1
+mes=datetime.today().month
+ano_atual=datetime.today().year
 
 
 st.title ('BiruBeard Analytics')
 
 dict_meses={1:'jan',2:'fev',3:'mar',4:'abr',5:'mai',6:'jun',7:'jul',8:'ago',9:'set',10:'out',11:'nov',12:'dez'}
+st.markdown("<h2 style='text-align: center;'>Faturamento por ano</h2>", unsafe_allow_html=True)
 col1,col2=st.columns([3,1])
 with col1:
-    ano_atual=df_agendamentos['ano'].max()
     ultimo_mes_ano_atual=df_agendamentos[df_agendamentos['ano']==ano_atual]['mes'].max()
     faturamento_ate_mes_atual=df_agendamentos[(df_agendamentos['mes']<=ultimo_mes_ano_atual)][['ano','Receita total']].groupby(by=['ano']).sum().reset_index()
-    fat_por_ano = px.bar(df_agendamentos[['ano','Receita total']].groupby(by=['ano']).sum().reset_index(), x="ano", y="Receita total",text_auto=True, title='Faturamento por ano')
+    fat_por_ano = px.bar(df_agendamentos[['ano','Receita total']].groupby(by=['ano']).sum().reset_index(), x="ano", y="Receita total",text_auto=True)
     fat_por_ano.add_trace(go.Scatter(x=faturamento_ate_mes_atual['ano'], y=faturamento_ate_mes_atual['Receita total'], mode='lines+markers', text='x', showlegend=False))
     fat_por_ano.update_traces(marker=dict(size=6,color='red'),selector=dict(mode='markers'))
     st.plotly_chart(fat_por_ano, use_container_width=True,)
@@ -145,21 +217,18 @@ with col2:
     st.write(f'Faturamento projetado {int(ano_atual)}: **R${fat_projetado_ano:,.2f}**')
     st.write(f'QTD de tickets {int(ano_atual)}: **{tickets_ano_atual}**')
     st.write(f'Ticket médio {int(ano_atual)}: **R${round(faturamento_ate_mes_atual_ano_atual/tickets_ano_atual,2)}**')
-
     
-    
-
+st.markdown("<h2 style='text-align: center;'>Faturamento por mês</h2>", unsafe_allow_html=True)
 col1,col2=st.columns([3,1]) 
 with col1:
-    fig_fat_por_mes_ano_atual=px.bar(df_agendamentos[df_agendamentos['ano']==ano_atual][['mes','Receita total']].groupby(by=['mes']).sum().reset_index(), x="mes", y="Receita total",text_auto=True, title='Faturamento por mês')
+    faturamento_ate_dia_equiv=df_agendamentos[(df_agendamentos['ano']==ano_atual)&(df_agendamentos['dia']<=hoje)][['mes','Receita total']].groupby(by=['mes']).sum().reset_index()
+    fig_fat_por_mes_ano_atual=px.bar(df_agendamentos[df_agendamentos['ano']==ano_atual][['mes','Receita total']].groupby(by=['mes']).sum().reset_index(), x="mes", y="Receita total",text_auto=True)
+    fig_fat_por_mes_ano_atual.add_trace(go.Scatter(x=faturamento_ate_dia_equiv['mes'], y=faturamento_ate_dia_equiv['Receita total'], mode='lines+markers', text='x', showlegend=False))
     st.plotly_chart(fig_fat_por_mes_ano_atual, use_container_width=True,)
 with col2:
-
-
     mes_atual_str=dict_meses[ultimo_mes_ano_atual]
-    #st.write(mes_atual_str)
     fat_mes_atual=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)]['Receita total'].sum()
-    fat_mes_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual-1) & (df_agendamentos['ano']==ano_atual)]['Receita total'].sum()
+    fat_mes_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual-1) & (df_agendamentos['ano']==ano_atual) & (df_agendamentos['dia']<=hoje)]['Receita total'].sum()
     crescimento_mes=(fat_mes_atual-fat_mes_passado)/fat_mes_passado
     fat_mes_atual_ano_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual-1)]['Receita total'].sum()
     tickets_mes_atual=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual) & (df_agendamentos['Status']=='Concluída')]['ID da Reserva'].count()
@@ -203,70 +272,62 @@ colunas=st.columns(num_colunas)
 for func in selecao_func_para_iterar:
 
     with colunas[coluna]:
-        st.write(f"**{func}** - **{mes_selecionado_str}/{int(selecao_ano2)}**")
-        df_func_atual=df_agendamentos[(df_agendamentos['mes']==selecao_mes2) & (df_agendamentos['ano']==selecao_ano2) & (df_agendamentos['Funcionário']==func)]
+
+        with st.expander(f'**{func}** - **{mes_selecionado_str}/{int(selecao_ano2)}**'):
+                
+           
+            df_func_atual=df_agendamentos[(df_agendamentos['mes']==selecao_mes2) & (df_agendamentos['ano']==selecao_ano2) & (df_agendamentos['Funcionário']==func)]
 
 
-        #Criação da tabela pro gráfico
-        if selecao_visao2=='QTD':
-            df_vendas_por_categoria_barbeiro=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).count().reset_index()
-            df_vendas_por_categoria_barbeiro['Porcentagem']=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).count().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
-            df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
-        else:
+            #Criação da tabela pro gráfico
+            if selecao_visao2=='QTD':
+                df_vendas_por_categoria_barbeiro=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).count().reset_index()
+                df_vendas_por_categoria_barbeiro['Porcentagem']=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).count().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
+                df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
+            else:
 
-            df_vendas_por_categoria_barbeiro=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().reset_index()
-            df_vendas_por_categoria_barbeiro['Porcentagem']=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
-            df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
+                df_vendas_por_categoria_barbeiro=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().reset_index()
+                df_vendas_por_categoria_barbeiro['Porcentagem']=df_func_atual[['Funcionário','Categoria principal','Receita total']].groupby(['Funcionário','Categoria principal']).sum().groupby(level=0).apply(lambda x: 100 * x / float(x.sum())).values
+                df_vendas_por_categoria_barbeiro['Porcentagem']=round(df_vendas_por_categoria_barbeiro['Porcentagem']).astype(int)
 
-        #Criação do gráfico por funcionario
+            #Criação do gráfico por funcionario
 
-        fig_vendas_categoria_barbeiro=px.bar(
-                df_vendas_por_categoria_barbeiro,
-                #name=funcionario,
-                y=dict_visao[selecao_visao],
-                x='Categoria principal',
-                text=dict_visao[selecao_visao])
-        fig_vendas_categoria_barbeiro.update_yaxes(title_text='')
-        fig_vendas_categoria_barbeiro.update_xaxes(title_text='')
-        if dict_visao[selecao_visao]=='Porcentagem':
-            fig_vendas_categoria_barbeiro.update_traces(texttemplate='%{y}%', textposition='inside', textangle=0)
-        else:
-            fig_vendas_categoria_barbeiro.update_traces(texttemplate='%{text:.2s}', textposition='inside', textangle=0)
-        st.plotly_chart(fig_vendas_categoria_barbeiro, use_container_width=True)
-
-
-
-
-
-
+            fig_vendas_categoria_barbeiro=px.bar(
+                    df_vendas_por_categoria_barbeiro,
+                    #name=funcionario,
+                    y=dict_visao[selecao_visao],
+                    x='Categoria principal',
+                    text=dict_visao[selecao_visao])
+            fig_vendas_categoria_barbeiro.update_yaxes(title_text='')
+            fig_vendas_categoria_barbeiro.update_xaxes(title_text='')
+            if dict_visao[selecao_visao]=='Porcentagem':
+                fig_vendas_categoria_barbeiro.update_traces(texttemplate='%{y}%', textposition='inside', textangle=0)
+            else:
+                fig_vendas_categoria_barbeiro.update_traces(texttemplate='%{text:.2s}', textposition='inside', textangle=0)
+            st.plotly_chart(fig_vendas_categoria_barbeiro, use_container_width=True)
 
 
 
-
-
-        
-        qtd_tickets_atual_func=df_func_atual[df_func_atual['Status']=='Concluída']['ID da Reserva'].count()
-        faturamento_atual_func=df_func_atual['Receita total'].sum()
-        st.write(f'Faturamento {mes_selecionado_str}/{int(selecao_ano2)}: **R${faturamento_atual_func:,.2f}**')
-        st.write(f'Qtd Tickets {mes_selecionado_str}/{int(selecao_ano2)}: **{qtd_tickets_atual_func}**')
-        st.write(f'Ticket médio {mes_selecionado_str}/{int(selecao_ano2)}: **R{faturamento_atual_func/qtd_tickets_atual_func:,.2f}**')
+            qtd_tickets_atual_func=df_func_atual[df_func_atual['Status']=='Concluída']['ID da Reserva'].count()
+            faturamento_atual_func=df_func_atual['Receita total'].sum()
+            faturamento_hoje=df_func_atual[df_func_atual['dia'] == hoje]['Receita total'].sum()
+            faturamento_ontem=df_func_atual[df_func_atual['dia'] == ontem]['Receita total'].sum()
+            st.write(f'Faturamento dia anterior: **R${faturamento_ontem:,.2f}**')
+            st.write(f'Faturamento dia atual: **R${faturamento_hoje:,.2f}**')
+            st.write(f'Faturamento {mes_selecionado_str}/{int(selecao_ano2)}: **R${faturamento_atual_func:,.2f}**')
+            st.write(f'Qtd Tickets {mes_selecionado_str}/{int(selecao_ano2)}: **{qtd_tickets_atual_func}**')
+            st.write(f'Ticket médio {mes_selecionado_str}/{int(selecao_ano2)}: **R${faturamento_atual_func/qtd_tickets_atual_func:,.2f}**')
+            #st.write(f)
        
-
-
-
-
-        
-        
-
-
-
-
-        st.write('-----')
     coluna=coluna+1
 
+
+
+#df_contatos_clientes
 #st.write(df_agendamentos.shape)
 #df_agendamentos
 st.write("----")
 st.write("###")
 #st.write(df_clientes.shape)
 #df_clientes
+
