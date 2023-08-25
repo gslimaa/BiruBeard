@@ -185,7 +185,7 @@ def importar_contato_clientes():
     df=pd.DataFrame(all_customers)[['a_to_z','cell_phone','email']]
     #display(df)
     df_grouped = df.groupby('a_to_z').agg({'cell_phone': ';'.join, 'email': ';'.join}).reset_index()
-    df_grouped=df_grouped.rename(columns={'a_to_z':'Nome','cell_phone':'Celular','email':'Email'})
+    df_grouped=df_grouped.rename(columns={'a_to_z':'Cliente','cell_phone':'Celular','email':'Email'})
     return df_grouped
 
 
