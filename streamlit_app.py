@@ -22,8 +22,8 @@ import concurrent.futures
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
-#123
-#@st.cache_data.clear()
+
+@st.cache_data.clear()
 @st.cache_data(show_spinner="Carregando dados")
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
@@ -185,7 +185,7 @@ def importar_contato_clientes():
     df=pd.DataFrame(all_customers)[['a_to_z','cell_phone','email']]
     #display(df)
     df_grouped = df.groupby('a_to_z').agg({'cell_phone': ';'.join, 'email': ';'.join}).reset_index()
-    df_grouped=df_grouped.rename(columns={'a_to_z':'Nome','cell_phone':'Celular','Email':'email'})
+    df_grouped=df_grouped.rename(columns={'a_to_z':'Nome','cell_phone':'Celular','email':'Email'})
     return df_grouped
 
 
@@ -277,7 +277,7 @@ mes_selecionado_str=dict_meses[selecao_mes2]
 
 selecao_func_para_iterar=np.sort(df_agendamentos[(df_agendamentos['mes']==selecao_mes2) & (df_agendamentos['ano']==selecao_ano2)]['Funcionário'].unique())
 #selecao_func_para_iterar
-
+df_clientes_recorrentes=df_agendamentos[df_agendamentos['ano']==ano_atual]
 colunas=st.columns(num_colunas)
 for func in selecao_func_para_iterar:
 
@@ -328,7 +328,23 @@ for func in selecao_func_para_iterar:
             st.write(f'Qtd Tickets {mes_selecionado_str}/{int(selecao_ano2)}: **{qtd_tickets_atual_func}**')
             st.write(f'Ticket médio {mes_selecionado_str}/{int(selecao_ano2)}: **R${faturamento_atual_func/qtd_tickets_atual_func:,.2f}**')
             #st.write(f)
-       
+    
+            client_counts=df_clientes_recorrentes_func['Cliente'].value_counts()
+            frequent_clients=client_counts[client_counts>=5].index
+
+            df_clientes_recorrentes_func=df_clientes_recorrentes_func.sort_values(by='Data e hora', ascending=False)
+            last_attendances=df_clientes_recorrentes_func.groupby('Cliente').first()
+            last_attendances=last_attendances.reset_index()
+            today=datetime.today()
+            last_attendances['dias s/ atend']=(today - last_attendances['Data e hora']).dt.days
+            filtered_clients = last_attendances[(last_attendances['dias s/ atend'] >= 45) &(last_attendances['dias s/ atend'] <= 60) & last_attendances['Cliente'].isin(frequent_clients)]
+            filtered_clients=filtered_clients.merge(df_contatos_clientes,on='Cliente')
+            st.write(filtered_clients[['Cliente','dias s/ atend','Celular','Email']])
+
+
+
+
+    
     coluna=coluna+1
 
 
