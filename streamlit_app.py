@@ -217,14 +217,15 @@ with col1:
     fat_por_ano.update_traces(marker=dict(size=6,color='red'),selector=dict(mode='markers'))
     st.plotly_chart(fat_por_ano, use_container_width=True,)
 with col2:
+    faturamento_ano_anterior=df_agendamentos[df_agendamentos['ano']==ano_atual-1]['Receita total'].sum()
     faturamento_ate_mes_atual_ano_atual=faturamento_ate_mes_atual[faturamento_ate_mes_atual['ano']==ano_atual]['Receita total'].values[0]
     faturamento_ate_mes_atual_ano_anterior=faturamento_ate_mes_atual[faturamento_ate_mes_atual['ano']==ano_atual-1]['Receita total'].values[0]
     crescimento_ytd = (faturamento_ate_mes_atual_ano_atual-faturamento_ate_mes_atual_ano_anterior)/faturamento_ate_mes_atual_ano_anterior
-    st.metric(label=f"Faturamento {int(ano_atual)}:", value=f"R${faturamento_ate_mes_atual_ano_atual:,.2f}", delta=f"{crescimento_ytd:.2%} vs {int(ano_atual)-1}")
+    st.metric(label=f"Faturamento {int(ano_atual)}:", value=f"R${faturamento_ate_mes_atual_ano_atual:,.0f}", delta=f"{crescimento_ytd:.0%} vs {int(ano_atual)-1}")
     st.write('---')
-    fat_projetado_ano=(faturamento_ate_mes_atual_ano_atual/ultimo_mes_ano_atual)*12
+    fat_projetado_ano=faturamento_ano_anterior+(faturamento_ano_anterior*crescimento_ytd)
     tickets_ano_atual=df_agendamentos[(df_agendamentos['ano']==ano_atual) & (df_agendamentos['Status']=='Concluída')]['ID da Reserva'].count()
-    st.write(f'Faturamento projetado {int(ano_atual)}: **R${fat_projetado_ano:,.2f}**')
+    st.write(f'Faturamento projetado {int(ano_atual)}: **R${fat_projetado_ano:,.0f}**')
     st.write(f'QTD de tickets {int(ano_atual)}: **{tickets_ano_atual}**')
     st.write(f'Ticket médio {int(ano_atual)}: **R${round(faturamento_ate_mes_atual_ano_atual/tickets_ano_atual,2)}**')
     
@@ -239,17 +240,18 @@ with col2:
     mes_atual_str=dict_meses[ultimo_mes_ano_atual]
     fat_mes_atual=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)]['Receita total'].sum()
     fat_mes_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual-1) & (df_agendamentos['ano']==ano_atual) & (df_agendamentos['dia']<=hoje)]['Receita total'].sum()
+    fat_total_mes_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual-1) & (df_agendamentos['ano']==ano_atual)]['Receita total'].sum()
     crescimento_mes=(fat_mes_atual-fat_mes_passado)/fat_mes_passado
     fat_mes_atual_ano_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual-1)]['Receita total'].sum()
     tickets_mes_atual=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual) & (df_agendamentos['Status']=='Concluída')]['ID da Reserva'].count()
     dia_atual=dt.date.today().day
     ultimo_dia_mes_atual=dt.date.today().replace(day=monthrange(dt.date.today().year,dt.date.today().month)[1]).day
-    fat_projetado_mes_atual=(fat_mes_atual/dia_atual)*ultimo_dia_mes_atual
+    fat_projetado_mes_atual=fat_total_mes_passado+(fat_total_mes_passado*crescimento_mes)
     #st.write(ultimo_dia_mes_atual)
-    st.metric(label=f"Faturamento mês {mes_atual_str}:", value=f"R${fat_mes_atual:,.2f}", delta=f"{crescimento_mes:.2%} vs {dict_meses[ultimo_mes_ano_atual-1]}")
+    st.metric(label=f"Faturamento mês {mes_atual_str}:", value=f"R${fat_mes_atual:,.0f}", delta=f"{crescimento_mes:.0%} vs {dict_meses[ultimo_mes_ano_atual-1]}")
     st.write('---')
     #st.write(f'Faturamento do mês atual em {ano_atual-1:.0f}: **R${fat_mes_atual_ano_passado:,.2f}**')
-    st.write(f'Faturamento projetado {mes_atual_str}: **R${fat_projetado_mes_atual:,.2f}**')
+    st.write(f'Faturamento projetado {mes_atual_str}: **R${fat_projetado_mes_atual:,.0f}**')
     #st.write(dia_atual)
     st.write(f'QTD de tickets {mes_atual_str}: **{tickets_mes_atual}**')
     st.write(f'Ticket médio {mes_atual_str}: **R${round(fat_mes_atual/tickets_mes_atual,2)}**')
@@ -339,6 +341,8 @@ for func in selecao_func_para_iterar:
             last_attendances['dias s/ atend']=(today - last_attendances['Data e hora']).dt.days
             filtered_clients = last_attendances[(last_attendances['dias s/ atend'] >= 45) &(last_attendances['dias s/ atend'] <= 60) & last_attendances['Cliente'].isin(frequent_clients)]
             filtered_clients=filtered_clients.merge(df_contatos_clientes,on='Cliente')
+            st.write("----")
+            st.markdown("<h5 style='text-align: center;'>Clientes a contatar:</h5>", unsafe_allow_html=True)
             st.write(filtered_clients[['Cliente','dias s/ atend','Celular','Email']])
 
 
