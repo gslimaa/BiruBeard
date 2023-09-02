@@ -23,8 +23,8 @@ import concurrent.futures
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 
-#@st.cache_data.clear() - para att
-@st.cache_data(show_spinner="Carregando dados de agendamento")
+#@st.cache_data.clear()
+@st.cache_data(show_spinner="Carregando dados")
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
     df.drop('Unnamed: 0', axis=1,inplace=True)
@@ -33,14 +33,13 @@ def importar_agendamentos():
     last_line=df.tail(1).index.values.astype(int)
     df.drop(last_line,inplace=True)
     return df
-    
-@st.cache_data(ttl=3600,show_spinner="Carregando dados de agendamento")
+
 def fetch_page_data(page, headers, params):
     response = requests.get(f'https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report?page={page}', params=params, headers=headers)
     return response.json().get("sections", [])
 
 
-@st.cache_data(ttl=3610,show_spinner="Carregando dados")
+@st.cache_data(ttl=3600,show_spinner="Carregando dados")
 def importar_ao_vivo_agendamentos():
     hoje=datetime.today().strftime('%Y-%m-%d')
     #hoje=hoje.day
@@ -194,6 +193,7 @@ df_agendamentos = importar_agendamentos()
 df_agendamentos_ao_vivo=importar_ao_vivo_agendamentos()
 df_contatos_clientes=importar_contato_clientes()
 
+
 df_agendamentos = pd.concat([df_agendamentos,df_agendamentos_ao_vivo],ignore_index=True)
 df_agendamentos['Data e hora']=pd.to_datetime(df_agendamentos['Data e hora'],dayfirst=True)
 df_agendamentos['ano'] = pd.DatetimeIndex(df_agendamentos['Data e hora']).year
@@ -238,6 +238,7 @@ with col1:
     fig_fat_por_mes_ano_atual.add_trace(go.Scatter(x=faturamento_ate_dia_equiv['mes'], y=faturamento_ate_dia_equiv['Receita total'], mode='lines+markers', text='x', showlegend=False))
     st.plotly_chart(fig_fat_por_mes_ano_atual, use_container_width=True,)
 with col2:
+    
     mes_atual_str=dict_meses[ultimo_mes_ano_atual]
     fat_mes_atual=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual) & (df_agendamentos['ano']==ano_atual)]['Receita total'].sum()
     fat_mes_passado=df_agendamentos[(df_agendamentos['mes']==ultimo_mes_ano_atual-1) & (df_agendamentos['ano']==ano_atual) & (df_agendamentos['dia']<=hoje)]['Receita total'].sum()
@@ -331,7 +332,10 @@ for func in selecao_func_para_iterar:
             st.write(f'Qtd Tickets {mes_selecionado_str}/{int(selecao_ano2)}: **{qtd_tickets_atual_func}**')
             st.write(f'Ticket médio {mes_selecionado_str}/{int(selecao_ano2)}: **R${faturamento_atual_func/qtd_tickets_atual_func:,.2f}**')
             #st.write(f)
-    
+
+            st.write("----")
+            st.markdown("<h5 style='text-align: center;'>Clientes a contatar:</h5>", unsafe_allow_html=True)
+
             client_counts=df_clientes_recorrentes_func['Cliente'].value_counts()
             frequent_clients=client_counts[client_counts>=5].index
 
@@ -341,15 +345,14 @@ for func in selecao_func_para_iterar:
             today=datetime.today()
             last_attendances['dias s/ atend']=(today - last_attendances['Data e hora']).dt.days
             filtered_clients = last_attendances[(last_attendances['dias s/ atend'] >= 45) &(last_attendances['dias s/ atend'] <= 60) & last_attendances['Cliente'].isin(frequent_clients)]
+            #st.write(filtered_clients[['Cliente','Funcionário','Data e hora','Dias_desde_ultimo_atendimento']])
             filtered_clients=filtered_clients.merge(df_contatos_clientes,on='Cliente')
-            st.write("----")
-            st.markdown("<h5 style='text-align: center;'>Clientes a contatar:</h5>", unsafe_allow_html=True)
-            st.write(filtered_clients[['Cliente','dias s/ atend','Celular','Email']])
+
+            st.write(filtered_clients[['Cliente','Funcionário','dias s/ atend','Celular','Email']])
+            #df_contatos_clientes
+            #st.write(last_attendances[['Cliente','Funcionário','Data e hora']])
 
 
-
-
-    
     coluna=coluna+1
 
 
