@@ -22,10 +22,9 @@ import concurrent.futures
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
-#12345
-#1234
-#@st.cache_data.clear()
-@st.cache_data(show_spinner="Carregando dados")
+
+#@st.cache_data.clear() - para att
+@st.cache_data(show_spinner="Carregando dados de agendamento")
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
     df.drop('Unnamed: 0', axis=1,inplace=True)
@@ -35,7 +34,7 @@ def importar_agendamentos():
     df.drop(last_line,inplace=True)
     return df
     
-@st.cache_data(ttl=3600,show_spinner="Carregando dados")
+@st.cache_data(ttl=3600,show_spinner="Carregando dados de agendamento")
 def fetch_page_data(page, headers, params):
     response = requests.get(f'https://br.booksy.com/api/br/2/business_api/me/stats/businesses/60247/report?page={page}', params=params, headers=headers)
     return response.json().get("sections", [])
