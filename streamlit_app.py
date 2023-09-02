@@ -22,7 +22,8 @@ import concurrent.futures
 
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
-#123
+#12345
+#1234
 #@st.cache_data.clear()
 @st.cache_data(show_spinner="Carregando dados")
 def importar_agendamentos():
