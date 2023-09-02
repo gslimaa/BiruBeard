@@ -68,7 +68,7 @@ def importar_ao_vivo_agendamentos():
     }
 
     params = {
-    'date_from': '2023-08-01',
+    'date_from': '2023-09-01',
     'date_till': hoje,
     'time_span': 'month',
     'report_key': 'appointments_list',
