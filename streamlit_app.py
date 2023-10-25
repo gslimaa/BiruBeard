@@ -23,7 +23,7 @@ import concurrent.futures
 favicon = Image.open('logo.jfif')
 st.set_page_config(page_title='BiruBeard',page_icon=favicon,layout="wide", initial_sidebar_state="collapsed")
 
-#@st.cache_data.clear()
+@st.cache_data.clear()
 @st.cache_data(show_spinner="Carregando dados")
 def importar_agendamentos():
     df=pd.read_excel(r"lista_fixa.xlsx",header=7)
@@ -42,6 +42,8 @@ def fetch_page_data(page, headers, params):
 @st.cache_data(ttl=3600,show_spinner="Carregando dados")
 def importar_ao_vivo_agendamentos():
     hoje=datetime.today().strftime('%Y-%m-%d')
+    primeiro_dia=datetime(datetime.now().year,datetime.now().month,1)
+    data_formatada=primeiro_dia.strftime('%Y-%m-%d')
     #hoje=hoje.day
     headers = {
     'authority': 'br.booksy.com',
@@ -67,7 +69,7 @@ def importar_ao_vivo_agendamentos():
     }
 
     params = {
-    'date_from': '2023-09-01',
+    'date_from': data_formatada,
     'date_till': hoje,
     'time_span': 'month',
     'report_key': 'appointments_list',
